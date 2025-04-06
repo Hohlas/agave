@@ -1008,7 +1008,8 @@ impl Tower {
         // slot to the current lockouts to pop any expired votes. If any of the
         // remaining voted slots are on a different fork from the checked slot,
         // it's still locked out.
-        let mut vote_state = self.vote_state.clone();
+        // let mut vote_state = self.vote_state.clone();
+        let mut vote_state = self.vote_state.vote_state.clone();
 
         for slot in including {
             process_slot_vote_unchecked(&mut vote_state, *slot);
@@ -1036,7 +1037,8 @@ impl Tower {
     }
 
     pub fn pop_votes_locked_out_at(&self, new_votes: &mut Vec<Slot>, slot: Slot) {
-        let mut vote_state = self.vote_state.clone();
+        //let mut vote_state = self.vote_state.clone();
+        let mut vote_state = self.vote_state.vote_state.clone();
 
         for i in 0..new_votes.len() {
             process_slot_vote_unchecked(&mut vote_state, new_votes[i]);
