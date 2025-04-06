@@ -223,7 +223,7 @@ pub struct Tower {
     pub node_pubkey: Pubkey,
     pub(crate) threshold_depth: usize,
     threshold_size: f64,
-    pub(crate) vote_state: TowerVoteState,
+    pub(crate) vote_state: VoteState,
     last_vote: VoteTransaction,
     // The blockhash used in the last vote transaction, may or may not equal the
     // blockhash of the voted block itself, depending if the vote slot was refreshed.
@@ -1008,7 +1008,7 @@ impl Tower {
         // slot to the current lockouts to pop any expired votes. If any of the
         // remaining voted slots are on a different fork from the checked slot,
         // it's still locked out.
-        //let mut vote_state = self.vote_state.clone();
+        let mut vote_state = self.vote_state.clone();
 
         for slot in including {
             process_slot_vote_unchecked(&mut vote_state, *slot);
@@ -1036,7 +1036,7 @@ impl Tower {
     }
 
     pub fn pop_votes_locked_out_at(&self, new_votes: &mut Vec<Slot>, slot: Slot) {
-        //let mut vote_state = self.vote_state.clone();
+        let mut vote_state = self.vote_state.clone();
 
         for i in 0..new_votes.len() {
             process_slot_vote_unchecked(&mut vote_state, new_votes[i]);
