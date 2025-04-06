@@ -223,7 +223,7 @@ pub struct Tower {
     pub node_pubkey: Pubkey,
     pub(crate) threshold_depth: usize,
     threshold_size: f64,
-    pub(crate) vote_state: VoteState,
+    pub(crate) vote_state: TowerVoteState,
     last_vote: VoteTransaction,
     // The blockhash used in the last vote transaction, may or may not equal the
     // blockhash of the voted block itself, depending if the vote slot was refreshed.
@@ -993,62 +993,7 @@ impl Tower {
         false
     }
 
-    // This version first pushes all of the 'including' slots onto the bank before evaluating 'slot'
-    pub fn is_locked_out_including(
-        &self,
-        slot: Slot,
-        ancestors: &HashSet<Slot>,
-        including: &Vec<Slot>,
-    ) -> bool {
-        if !self.is_recent(slot) {
-            return true;
-        }
-
-        // Check if a slot is locked out by simulating adding a vote for that
-        // slot to the current lockouts to pop any expired votes. If any of the
-        // remaining voted slots are on a different fork from the checked slot,
-        // it's still locked out.
-        let mut vote_state = self.vote_state.clone();
-
-        for slot in including {
-            process_slot_vote_unchecked(&mut vote_state, *slot);
-        }
-
-        process_slot_vote_unchecked(&mut vote_state, slot);
-        for vote in &vote_state.votes {
-            if slot != vote.slot() && !ancestors.contains(&vote.slot()) {
-                return true;
-            }
-        }
-
-        if let Some(root_slot) = vote_state.root_slot {
-            if slot != root_slot {
-                // This case should never happen because bank forks purges all
-                // non-descendants of the root every time root is set
-                assert!(
-                    ancestors.contains(&root_slot),
-                    "ancestors: {ancestors:?}, slot: {slot} root: {root_slot}"
-                );
-            }
-        }
-
-        false
-    }
-
-    pub fn pop_votes_locked_out_at(&self, new_votes: &mut Vec<Slot>, slot: Slot) {
-        let mut vote_state = self.vote_state.clone();
-
-        for i in 0..new_votes.len() {
-            process_slot_vote_unchecked(&mut vote_state, new_votes[i]);
-            if let Some(last_lockout) = vote_state.last_lockout() {
-                if last_lockout.is_locked_out_at_slot(slot) {
-                    // New votes cannot include this or any subsequent slots
-                    new_votes.truncate(i);
-                    return;
-                }
-            }
-        }
-    }
+    
 
     /// Checks if a vote for `candidate_slot` is usable in a switching proof
     /// from `last_voted_slot` to `switch_slot`.
