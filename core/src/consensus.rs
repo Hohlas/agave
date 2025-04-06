@@ -237,6 +237,16 @@ pub struct Tower {
     // bank_forks (=~ ledger) lacks the slot or not.
     stray_restored_slot: Option<Slot>,
     pub last_switch_threshold_check: Option<(Slot, SwitchForkDecision)>,
+    #[serde(skip)]
+    mostly_confirmed_threshold: Option<f64>,
+    #[serde(skip)]
+    threshold_ahead_count: Option<u8>,
+    #[serde(skip)]
+    after_skip_threshold: Option<u8>,
+    #[serde(skip)]
+    threshold_escape_count: Option<u8>,
+    #[serde(skip)]
+    last_config_check_seconds: u64,
 }
 
 impl Default for Tower {
@@ -251,6 +261,11 @@ impl Default for Tower {
             last_vote_tx_blockhash: BlockhashStatus::default(),
             stray_restored_slot: Option::default(),
             last_switch_threshold_check: Option::default(),
+            mostly_confirmed_threshold: None,
+            threshold_ahead_count: None,
+            after_skip_threshold: None,
+            threshold_escape_count: None,
+            last_config_check_seconds: 0,
         };
         // VoteState::root_slot is ensured to be Some in Tower
         tower.vote_state.root_slot = Some(Slot::default());
@@ -290,6 +305,11 @@ impl From<Tower1_14_11> for Tower {
             last_timestamp: tower.last_timestamp,
             stray_restored_slot: tower.stray_restored_slot,
             last_switch_threshold_check: tower.last_switch_threshold_check,
+            mostly_confirmed_threshold: None,
+            threshold_ahead_count: None,
+            after_skip_threshold: None,
+            threshold_escape_count: None,
+            last_config_check_seconds: 0,
         }
     }
 }
@@ -308,6 +328,11 @@ impl From<Tower1_7_14> for Tower {
             last_timestamp: tower.last_timestamp,
             stray_restored_slot: tower.stray_restored_slot,
             last_switch_threshold_check: tower.last_switch_threshold_check,
+            mostly_confirmed_threshold: None,
+            threshold_ahead_count: None,
+            after_skip_threshold: None,
+            threshold_escape_count: None,
+            last_config_check_seconds: 0,
         }
     }
 }
@@ -679,7 +704,7 @@ impl Tower {
         trace!("{} record_vote for {}", self.node_pubkey, vote_slot);
         let old_root = self.root();
 
-        self.vote_state.process_next_vote_slot(vote_slot);
+        self.vote_state.process_next_vote_slot(vote_slot, true);
         self.update_last_vote_from_vote_state(vote_hash, enable_tower_sync_ix, block_id);
 
         let new_root = self.root();
@@ -1649,6 +1674,20 @@ impl Tower {
 
     pub fn restore(tower_storage: &dyn TowerStorage, node_pubkey: &Pubkey) -> Result<Self> {
         tower_storage.load(node_pubkey)
+    }
+
+    pub fn is_mostly_confirmed_threshold_enabled(&self) -> bool {
+        if let Some(_) = self.mostly_confirmed_threshold {
+            true
+        } else {
+            false
+        }
+    }
+    
+    pub fn is_slot_mostly_confirmed(&self, slot: Slot, voted_stakes: &VotedStakes, total_stake: Stake) -> bool {
+        let mostly_confirmed_threshold = if let Some(m) = self.mostly_confirmed_threshold { m } else { SWITCH_FORK_THRESHOLD };
+ 
+        voted_stakes.get(&slot).map(|stake| (*stake as f64 / total_stake as f64) > mostly_confirmed_threshold).unwrap_or(false)
     }
 }
 
