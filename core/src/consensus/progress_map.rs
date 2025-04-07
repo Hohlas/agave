@@ -374,6 +374,11 @@ impl ProgressMap {
         slot_progress.fork_stats.duplicate_confirmed_hash = Some(hash);
     }
 
+    pub fn set_mostly_confirmed_slot(&mut self, slot: Slot) {
+        let slot_progress = self.get_mut(&slot).unwrap();
+        slot_progress.fork_stats.is_mostly_confirmed = true;
+    }
+
     pub fn is_duplicate_confirmed(&self, slot: Slot) -> Option<bool> {
         self.progress_map
             .get(&slot)
