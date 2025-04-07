@@ -886,7 +886,8 @@ impl Tower {
         let old_root = self.root();
 
         if pop_expired {
-            self.pop_expired_votes(vote_slot);
+            warn!("self.pop_expired_votes");
+            //self.pop_expired_votes(vote_slot);
         }
 
         self.vote_state.process_next_vote_slot(vote_slot);
