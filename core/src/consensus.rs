@@ -8,7 +8,7 @@ pub mod tower_storage;
 pub(crate) mod tower_vote_state;
 pub mod tree_diff;
 pub mod vote_stake_tracker;
-
+use solana_vote_program::vote_state::{VoteState, LandedVote};
 use {
     self::{
         heaviest_subtree_fork_choice::HeaviestSubtreeForkChoice,
@@ -332,6 +332,34 @@ impl From<Tower1_7_14> for Tower {
             threshold_escape_count: None,
             last_config_check_seconds: 0,
         }
+    }
+}
+
+   // Добавляем преобразование из TowerVoteState в VoteState
+impl From<TowerVoteState> for VoteState {
+    fn from(tower_vote_state: TowerVoteState) -> Self {
+        // Сначала преобразуем TowerVoteState в VoteState1_14_11
+        let vote_state_1_14_11: VoteState1_14_11 = tower_vote_state.into();
+        
+        // Создаем VoteState с теми же данными
+        let mut vote_state = Self::default();
+        
+        // Копируем основные поля
+        vote_state.root_slot = vote_state_1_14_11.root_slot;
+        
+        // Преобразуем коллекцию голосов из Lockout в LandedVote
+        vote_state.votes = vote_state_1_14_11.votes
+            .into_iter()
+            .map(|lockout| {
+                // Создаем LandedVote из Lockout
+                LandedVote {
+                    lockout,
+                    latency: 0, // Используем значение по умолчанию
+                }
+            })
+            .collect();
+        
+        vote_state
     }
 }
 
@@ -992,34 +1020,6 @@ impl Tower {
         }
 
         false
-    }
-
-       // Добавляем преобразование из TowerVoteState в VoteState
-    impl From<TowerVoteState> for VoteState {
-        fn from(tower_vote_state: TowerVoteState) -> Self {
-            // Сначала преобразуем TowerVoteState в VoteState1_14_11
-            let vote_state_1_14_11: VoteState1_14_11 = tower_vote_state.into();
-            
-            // Создаем VoteState с теми же данными
-            let mut vote_state = Self::default();
-            
-            // Копируем основные поля
-            vote_state.root_slot = vote_state_1_14_11.root_slot;
-            
-            // Преобразуем коллекцию голосов из Lockout в LandedVote
-            vote_state.votes = vote_state_1_14_11.votes
-                .into_iter()
-                .map(|lockout| {
-                    // Создаем LandedVote из Lockout
-                    LandedVote {
-                        lockout,
-                        latency: 0, // Используем значение по умолчанию
-                    }
-                })
-                .collect();
-            
-            vote_state
-        }
     }
 
     // This version first pushes all of the 'including' slots onto the bank before evaluating 'slot'
