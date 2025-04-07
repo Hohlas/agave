@@ -702,7 +702,6 @@ impl Tower {
         self.record_bank_vote_and_update_lockouts(
             bank.slot(),
             bank.hash(),
-            //pop_expired,
             bank.feature_set
                 .is_active(&agave_feature_set::enable_tower_sync_ix::id()),
             block_id,
@@ -903,7 +902,7 @@ impl Tower {
 
     #[cfg(feature = "dev-context-only-utils")]
     pub fn record_vote(&mut self, slot: Slot, hash: Hash) -> Option<Slot> {
-        self.record_bank_vote_and_update_lockouts(slot, hash, true, true, Hash::default())
+        self.record_bank_vote_and_update_lockouts(slot, hash, true, Hash::default())
     }
 
     #[cfg(feature = "dev-context-only-utils")]
