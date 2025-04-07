@@ -161,7 +161,20 @@ impl SwitchForkDecision {
         }
     }
 }
-
+fn process_tower_vote_state_unchecked(tower_vote_state: &mut TowerVoteState, slot: Slot) {
+    // Здесь нужно получить ссылку на внутренний VoteState из TowerVoteState
+    // Предполагается, что у TowerVoteState есть метод для доступа к внутреннему VoteState
+    // или vote_state является полем TowerVoteState
+    
+    // Например, если есть метод vote_state_mut()
+    let vote_state = tower_vote_state.vote_state_mut();
+    
+    // Или если vote_state - это публичное поле
+    // let vote_state = &mut tower_vote_state.vote_state;
+    
+    // Вызов оригинальной функции
+    process_slot_vote_unchecked(vote_state, slot);
+}
 const VOTE_THRESHOLD_DEPTH_SHALLOW: usize = 4;
 pub const VOTE_THRESHOLD_DEPTH: usize = 8;
 pub const SWITCH_FORK_THRESHOLD: f64 = 0.38;
@@ -674,7 +687,6 @@ impl Tower {
         self.record_bank_vote_and_update_lockouts(
             bank.slot(),
             bank.hash(),
-            pop_expired,
             bank.feature_set
                 .is_active(&agave_feature_set::enable_tower_sync_ix::id()),
             block_id,
@@ -1012,10 +1024,10 @@ impl Tower {
         let mut vote_state = self.vote_state.clone();
 
         for slot in including {
-            process_slot_vote_unchecked(&mut vote_state, *slot);
+            process_tower_vote_state_unchecked(&mut vote_state, *slot);
         }
 
-        process_slot_vote_unchecked(&mut vote_state, slot);
+        process_tower_vote_state_unchecked(&mut vote_state, slot);
         for vote in &vote_state.votes {
             if slot != vote.slot() && !ancestors.contains(&vote.slot()) {
                 return true;
@@ -1040,7 +1052,7 @@ impl Tower {
         let mut vote_state = self.vote_state.clone();
 
         for i in 0..new_votes.len() {
-            process_slot_vote_unchecked(&mut vote_state, new_votes[i]);
+            process_tower_vote_state_unchecked(&mut vote_state, new_votes[i]);
             if let Some(last_lockout) = vote_state.last_lockout() {
                 if last_lockout.is_locked_out_at_slot(slot) {
                     // New votes cannot include this or any subsequent slots
