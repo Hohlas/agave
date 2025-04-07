@@ -161,20 +161,7 @@ impl SwitchForkDecision {
         }
     }
 }
-fn process_tower_vote_state_unchecked(tower_vote_state: &mut TowerVoteState, slot: Slot) {
-    // Здесь нужно получить ссылку на внутренний VoteState из TowerVoteState
-    // Предполагается, что у TowerVoteState есть метод для доступа к внутреннему VoteState
-    // или vote_state является полем TowerVoteState
-    
-    // Например, если есть метод vote_state_mut()
-    let vote_state = tower_vote_state.vote_state_mut();
-    
-    // Или если vote_state - это публичное поле
-    // let vote_state = &mut tower_vote_state.vote_state;
-    
-    // Вызов оригинальной функции
-    process_slot_vote_unchecked(vote_state, slot);
-}
+
 const VOTE_THRESHOLD_DEPTH_SHALLOW: usize = 4;
 pub const VOTE_THRESHOLD_DEPTH: usize = 8;
 pub const SWITCH_FORK_THRESHOLD: f64 = 0.38;
@@ -687,6 +674,7 @@ impl Tower {
         self.record_bank_vote_and_update_lockouts(
             bank.slot(),
             bank.hash(),
+            //pop_expired,
             bank.feature_set
                 .is_active(&agave_feature_set::enable_tower_sync_ix::id()),
             block_id,
@@ -1006,6 +994,34 @@ impl Tower {
         false
     }
 
+       // Добавляем преобразование из TowerVoteState в VoteState
+    impl From<TowerVoteState> for VoteState {
+        fn from(tower_vote_state: TowerVoteState) -> Self {
+            // Сначала преобразуем TowerVoteState в VoteState1_14_11
+            let vote_state_1_14_11: VoteState1_14_11 = tower_vote_state.into();
+            
+            // Создаем VoteState с теми же данными
+            let mut vote_state = Self::default();
+            
+            // Копируем основные поля
+            vote_state.root_slot = vote_state_1_14_11.root_slot;
+            
+            // Преобразуем коллекцию голосов из Lockout в LandedVote
+            vote_state.votes = vote_state_1_14_11.votes
+                .into_iter()
+                .map(|lockout| {
+                    // Создаем LandedVote из Lockout
+                    LandedVote {
+                        lockout,
+                        latency: 0, // Используем значение по умолчанию
+                    }
+                })
+                .collect();
+            
+            vote_state
+        }
+    }
+
     // This version first pushes all of the 'including' slots onto the bank before evaluating 'slot'
     pub fn is_locked_out_including(
         &self,
@@ -1021,13 +1037,14 @@ impl Tower {
         // slot to the current lockouts to pop any expired votes. If any of the
         // remaining voted slots are on a different fork from the checked slot,
         // it's still locked out.
-        let mut vote_state = self.vote_state.clone();
+        // let mut vote_state = self.vote_state.clone();
+        let mut vote_state: VoteState = self.vote_state.clone().into();
 
         for slot in including {
-            process_tower_vote_state_unchecked(&mut vote_state, *slot);
+            process_slot_vote_unchecked(&mut vote_state, *slot);
         }
 
-        process_tower_vote_state_unchecked(&mut vote_state, slot);
+        process_slot_vote_unchecked(&mut vote_state, slot);
         for vote in &vote_state.votes {
             if slot != vote.slot() && !ancestors.contains(&vote.slot()) {
                 return true;
@@ -1049,10 +1066,11 @@ impl Tower {
     }
 
     pub fn pop_votes_locked_out_at(&self, new_votes: &mut Vec<Slot>, slot: Slot) {
-        let mut vote_state = self.vote_state.clone();
+        // let mut vote_state = self.vote_state.clone();
+        let mut vote_state: VoteState = self.vote_state.clone().into();
 
         for i in 0..new_votes.len() {
-            process_tower_vote_state_unchecked(&mut vote_state, new_votes[i]);
+            process_slot_vote_unchecked(&mut vote_state, new_votes[i]);
             if let Some(last_lockout) = vote_state.last_lockout() {
                 if last_lockout.is_locked_out_at_slot(slot) {
                     // New votes cannot include this or any subsequent slots
