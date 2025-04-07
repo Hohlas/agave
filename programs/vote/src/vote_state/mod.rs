@@ -147,47 +147,6 @@ impl From<TowerSync> for VoteTransaction {
     }
 }
 
-pub fn process_next_vote_slot(
-    &mut self,
-    next_vote_slot: Slot,
-    epoch: Epoch,
-    current_slot: Slot,
-    timely_vote_credits: bool,
-    pop_expired: bool,
-) {
-    // Ignore votes for slots earlier than we already have votes for
-    if self
-        .last_voted_slot()
-        .map_or(false, |last_voted_slot| next_vote_slot <= last_voted_slot)
-    {
-        return;
-    }
-
-    if pop_expired {
-        self.pop_expired_votes(next_vote_slot);
-    }    
-
-    let landed_vote = LandedVote {
-        latency: if timely_vote_credits {
-            Self::compute_vote_latency(next_vote_slot, current_slot)
-        } else {
-            0
-        },
-        lockout: Lockout::new(next_vote_slot),
-    };
-
-    // Once the stack is full, pop the oldest lockout and distribute rewards
-    if self.votes.len() == MAX_LOCKOUT_HISTORY {
-        let credits = self.credits_for_vote_at_index(0, timely_vote_credits);
-        let landed_vote = self.votes.pop_front().unwrap();
-        self.root_slot = Some(landed_vote.slot());
-
-        self.increment_credits(epoch, credits);
-    }
-    self.votes.push_back(landed_vote);
-    self.double_lockouts();
-}
-
 // utility function, used by Stakes, tests
 pub fn from<T: ReadableAccount>(account: &T) -> Option<VoteState> {
     VoteState::deserialize(account.data()).ok()
